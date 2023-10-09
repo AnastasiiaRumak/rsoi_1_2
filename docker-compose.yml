@@ -1,0 +1,119 @@
+version: "3"
+services:
+  postgres:
+    image: library/postgres:13
+    container_name: postgres
+    restart: on-failure
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./postgres/:/docker-entrypoint-initdb.d/
+    ports:
+      - "5000:5432"
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 15s
+      timeout: 15s
+      retries: 10
+
+
+  pgadmin:
+    container_name: pgadmin4_container
+    image: dpage/pgadmin4
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "5050:80"
+
+  cars_service:
+    build: app/cars
+    container_name: cars_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATA_BASE_PORT: "5432"
+      DATA_BASE_NAME: "cars"
+      DATA_BASE_USER: "program"
+      DATA_BASE_PASS: "test"
+      DATA_BASE_HOST: "postgres"
+    ports:
+      - "8070:8070"
+
+  payment_service:
+    build: app/payment
+    container_name: payment_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATA_BASE_PORT: "5432"
+      DATA_BASE_NAME: "payments"
+      DATA_BASE_USER: "program"
+      DATA_BASE_PASS: "test"
+      DATA_BASE_HOST: "postgres"
+    ports:
+      - "8050:8050"
+
+  rental_service:
+    build: app/rental
+    container_name: rental_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATA_BASE_PORT: "5432"
+      DATA_BASE_NAME: "rentals"
+      DATA_BASE_USER: "program"
+      DATA_BASE_PASS: "test"
+      DATA_BASE_HOST: "postgres"
+    ports:
+      - "8060:8060"
+
+  gateway_service:
+    build: app/gateway
+    container_name: gateway_service
+    ports:
+      - "8080:8080"
+
+  queue_service:
+    build: app/queue
+    container_name: queue_service
+    ports:
+      - "8040:8040"
+
+  frontend:
+    image: nginx
+    container_name: frontend
+    working_dir: /usr/share/nginx/html
+    restart: always
+    ports:
+      - "3000:80"
+    volumes:
+      - ./app/frontend:/usr/share/nginx/html
+
+
+#  statistic_service:
+#    build: services
+#    container_name: statistic_service
+#    restart: always
+#    ports:
+#      - "8030:80"
+#    depends_on:
+#      - postgres
+#      - identity_provider
+#    volumes:
+#      - ./app/statistic_service:/var/www/html
+#      - ./instruments:/var/www/html/instruments
+#    command: bash -c "composer install && php instruments/load_jwks.php && mkdir -p db && chmod 777 -R ./db && { php /var/www/html/save_statistic.php > /dev/null & } && apache2-foreground"
+
+
+
+volumes:
+  db-data:
